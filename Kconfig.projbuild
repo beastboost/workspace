@@ -1,0 +1,108 @@
+menu "GBA Emulator Configuration"
+
+    config GBA_ENABLE_AUDIO
+        bool "Enable audio output"
+        default y
+        help
+            Enable audio emulation and output via I2S.
+            Disabling audio can improve performance.
+
+    config GBA_AUDIO_SAMPLE_RATE
+        int "Audio sample rate (Hz)"
+        default 32768
+        depends on GBA_ENABLE_AUDIO
+        help
+            Audio output sample rate. Lower values use less CPU
+            but have lower quality.
+
+    config GBA_FRAMESKIP
+        int "Frame skip (0=disabled)"
+        default 0
+        range 0 10
+        help
+            Number of frames to skip between rendered frames.
+            Higher values improve performance but reduce smoothness.
+            0 = render every frame
+
+    config GBA_SHOW_FPS
+        bool "Show FPS counter"
+        default y
+        help
+            Display frames per second in the serial output.
+
+    menu "Display Configuration"
+        config GBA_LCD_WIDTH
+            int "LCD width"
+            default 320
+
+        config GBA_LCD_HEIGHT
+            int "LCD height"
+            default 240
+
+        config GBA_LCD_PIXEL_CLOCK_MHZ
+            int "LCD pixel clock (MHz)"
+            default 16
+
+        config GBA_LCD_BACKLIGHT_PIN
+            int "Backlight GPIO pin"
+            default 1
+    endmenu
+
+    menu "Input Configuration"
+        config GBA_INPUT_A_PIN
+            int "Button A GPIO"
+            default 4
+
+        config GBA_INPUT_B_PIN
+            int "Button B GPIO"
+            default 5
+
+        config GBA_INPUT_SELECT_PIN
+            int "Button SELECT GPIO"
+            default 6
+
+        config GBA_INPUT_START_PIN
+            int "Button START GPIO"
+            default 7
+
+        config GBA_INPUT_UP_PIN
+            int "D-Pad UP GPIO"
+            default 15
+
+        config GBA_INPUT_DOWN_PIN
+            int "D-Pad DOWN GPIO"
+            default 16
+
+        config GBA_INPUT_LEFT_PIN
+            int "D-Pad LEFT GPIO"
+            default 17
+
+        config GBA_INPUT_RIGHT_PIN
+            int "D-Pad RIGHT GPIO"
+            default 18
+
+        config GBA_INPUT_L_PIN
+            int "Button L GPIO"
+            default 19
+
+        config GBA_INPUT_R_PIN
+            int "Button R GPIO"
+            default 20
+    endmenu
+
+    menu "SD Card Configuration"
+        config GBA_SD_4BIT_MODE
+            bool "Use 4-bit SD mode"
+            default y
+            help
+                Use 4-bit SDMMC mode for faster transfers.
+                Disable for 1-bit mode if you have wiring issues.
+
+        config GBA_ROM_PATH
+            string "ROM directory path"
+            default "/sdcard/gba"
+            help
+                Directory on SD card where ROM files are stored.
+    endmenu
+
+endmenu
