@@ -9,4 +9,6 @@ idf_component_register(
         fatfs
     EMBED_FILES
         "www/index.html"
+        "www/manifest.json"
+        "www/sw.js"
 )

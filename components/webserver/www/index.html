@@ -2,326 +2,470 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>GBA Emulator - ESP32-P4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#9d4edd">
+    <meta name="description" content="GBA Emulator for ESP32-P4">
+
+    <title>GBA Emulator</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%239d4edd' width='180' height='180' rx='32'/><text x='90' y='115' font-size='80' text-anchor='middle' fill='white'>🎮</text></svg>">
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+        }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: linear-gradient(180deg, #2d1b4e 0%, #1a1a2e 100%);
             color: #fff;
-            min-height: 100vh;
-            overflow-x: hidden;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
-            text-align: center;
-            padding: 20px 0;
-            border-bottom: 1px solid #333;
-            margin-bottom: 20px;
-        }
-
-        header h1 {
-            font-size: 2em;
-            background: linear-gradient(90deg, #9d4edd, #c77dff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .status-bar {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            font-size: 0.9em;
-            color: #888;
-            margin-top: 10px;
-        }
-
-        .status-bar span { display: flex; align-items: center; gap: 5px; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-        .status-dot.online { background: #4ade80; }
-        .status-dot.offline { background: #f87171; }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 20px;
-        }
-
-        @media (max-width: 900px) {
-            .main-content { grid-template-columns: 1fr; }
-        }
-
-        /* Game Screen */
-        .game-container {
-            background: #000;
-            border-radius: 12px;
-            padding: 20px;
+        /* GBA Console Shell */
+        .gba-console {
             display: flex;
             flex-direction: column;
+            height: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            background: linear-gradient(145deg, #5c4d7d 0%, #3d3259 50%, #2a2440 100%);
+            border-radius: 20px;
+            padding: 10px;
+            box-shadow:
+                inset 0 2px 4px rgba(255,255,255,0.1),
+                0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        @media (min-width: 800px) {
+            .gba-console {
+                max-width: 800px;
+                margin: 20px auto;
+                height: calc(100% - 40px);
+            }
+        }
+
+        /* Top bar with speaker grills */
+        .gba-top {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
+            padding: 5px 15px;
+        }
+
+        .speaker-grill {
+            display: flex;
+            gap: 3px;
+        }
+
+        .speaker-grill span {
+            width: 4px;
+            height: 20px;
+            background: #222;
+            border-radius: 2px;
+        }
+
+        .power-led {
+            width: 8px;
+            height: 8px;
+            background: #333;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .power-led.on {
+            background: #4ade80;
+            box-shadow: 0 0 10px #4ade80;
+        }
+
+        /* Screen bezel */
+        .screen-bezel {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 8px;
+            margin: 5px 10px;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.5);
+        }
+
+        .screen-inner {
+            background: #000;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
         }
 
         #game-canvas {
+            display: block;
             width: 100%;
-            max-width: 480px;
             aspect-ratio: 240 / 160;
-            background: #111;
-            border-radius: 8px;
+            background: #0a0a0a;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
 
-        .game-controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
+        .screen-label {
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            margin-top: 4px;
+            letter-spacing: 2px;
         }
 
-        .game-controls button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #333;
-            color: #fff;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.2s;
-        }
-
-        .game-controls button:hover { background: #444; }
-        .game-controls button:active { transform: scale(0.95); }
-        .game-controls button.primary { background: #9d4edd; }
-        .game-controls button.danger { background: #dc2626; }
-
-        /* Virtual Gamepad */
-        .gamepad {
-            display: none;
-            margin-top: 20px;
-            width: 100%;
-            max-width: 400px;
-        }
-
-        @media (max-width: 768px) {
-            .gamepad { display: block; }
-        }
-
-        .gamepad-row {
+        /* Controls area */
+        .controls-area {
+            flex: 1;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 10px 0;
+            padding: 10px 15px;
+            min-height: 180px;
+        }
+
+        /* D-Pad */
+        .dpad-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
         }
 
         .dpad {
-            display: grid;
-            grid-template-columns: repeat(3, 50px);
-            grid-template-rows: repeat(3, 50px);
-            gap: 2px;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .dpad-bg {
+            position: absolute;
+            width: 40px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            border-radius: 8px;
+        }
+
+        .dpad-bg-h {
+            position: absolute;
+            width: 100%;
+            height: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #222;
+            border-radius: 8px;
         }
 
         .dpad-btn {
+            position: absolute;
+            width: 40px;
+            height: 40px;
             background: #333;
             border: none;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 1.5em;
-            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
+            font-size: 16px;
+            color: #666;
+            cursor: pointer;
+            z-index: 1;
         }
 
-        .dpad-btn:active { background: #9d4edd; }
-        .dpad-center { background: transparent; }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: #9d4edd;
+            color: #fff;
+        }
 
-        .action-btns {
+        .dpad-up { top: 0; left: 50%; transform: translateX(-50%); border-radius: 8px 8px 0 0; }
+        .dpad-down { bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 0 0 8px 8px; }
+        .dpad-left { left: 0; top: 50%; transform: translateY(-50%); border-radius: 8px 0 0 8px; }
+        .dpad-right { right: 0; top: 50%; transform: translateY(-50%); border-radius: 0 8px 8px 0; }
+
+        .dpad-center {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: #2a2a2a;
+            border-radius: 4px;
+            z-index: 2;
+        }
+
+        /* Action Buttons (A/B) */
+        .action-buttons {
             display: flex;
+            gap: 15px;
+            transform: rotate(-25deg);
+        }
+
+        .btn-a, .btn-b {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow:
+                0 4px 0 rgba(0,0,0,0.3),
+                inset 0 -2px 4px rgba(0,0,0,0.2),
+                inset 0 2px 4px rgba(255,255,255,0.1);
+            transition: transform 0.05s, box-shadow 0.05s;
+        }
+
+        .btn-a {
+            background: linear-gradient(145deg, #dc2626, #b91c1c);
+            color: #fff;
+        }
+
+        .btn-b {
+            background: linear-gradient(145deg, #dc2626, #b91c1c);
+            color: #fff;
+            margin-top: 30px;
+        }
+
+        .btn-a:active, .btn-a.pressed,
+        .btn-b:active, .btn-b.pressed {
+            transform: translateY(2px);
+            box-shadow:
+                0 2px 0 rgba(0,0,0,0.3),
+                inset 0 -1px 2px rgba(0,0,0,0.2);
+        }
+
+        .btn-label {
+            position: absolute;
+            font-size: 10px;
+            color: #666;
+            margin-top: 60px;
+            width: 55px;
+            text-align: center;
+        }
+
+        /* Middle section (Start/Select + Logo) */
+        .middle-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             gap: 15px;
         }
 
-        .action-btn {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: #dc2626;
-            border: none;
-            color: #fff;
-            font-size: 1.2em;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-        }
-
-        .action-btn.b-btn { background: #f59e0b; }
-        .action-btn:active { filter: brightness(1.3); }
-
-        .shoulder-btns {
+        .menu-buttons {
             display: flex;
-            justify-content: space-between;
-            width: 100%;
+            gap: 20px;
+            transform: rotate(-25deg);
         }
 
-        .shoulder-btn {
-            padding: 15px 30px;
+        .btn-select, .btn-start {
+            width: 50px;
+            height: 18px;
             background: #444;
             border: none;
-            border-radius: 8px;
-            color: #fff;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        .shoulder-btn:active { background: #9d4edd; }
-
-        .menu-btns {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-        }
-
-        .menu-btn {
-            padding: 8px 20px;
-            background: #555;
-            border: none;
-            border-radius: 20px;
-            color: #fff;
-            font-size: 0.8em;
-            cursor: pointer;
-        }
-
-        .menu-btn:active { background: #9d4edd; }
-
-        /* Sidebar */
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .panel {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 15px;
-        }
-
-        .panel h3 {
-            font-size: 0.9em;
+            border-radius: 10px;
+            font-size: 8px;
             color: #888;
-            margin-bottom: 15px;
+            cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
         }
 
-        /* ROM List */
-        .rom-list {
-            max-height: 300px;
+        .btn-select:active, .btn-select.pressed,
+        .btn-start:active, .btn-start.pressed {
+            background: #9d4edd;
+            color: #fff;
+        }
+
+        /* Shoulder buttons */
+        .shoulder-buttons {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+        }
+
+        .btn-shoulder {
+            width: 80px;
+            height: 25px;
+            background: linear-gradient(180deg, #444 0%, #333 100%);
+            border: none;
+            border-radius: 0 0 10px 10px;
+            color: #888;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .btn-shoulder:active, .btn-shoulder.pressed {
+            background: linear-gradient(180deg, #9d4edd 0%, #7c3aed 100%);
+            color: #fff;
+        }
+
+        /* Menu overlay */
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+            padding: 20px;
             overflow-y: auto;
         }
 
-        .rom-item {
-            padding: 10px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            margin-bottom: 8px;
+        .menu-overlay.active { display: flex; }
+
+        .menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .menu-header h2 {
+            font-size: 1.5em;
+            color: #9d4edd;
+        }
+
+        .menu-close {
+            width: 40px;
+            height: 40px;
+            background: #333;
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 20px;
             cursor: pointer;
-            transition: all 0.2s;
+        }
+
+        .menu-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .menu-tab {
+            padding: 10px 20px;
+            background: #333;
+            border: none;
+            border-radius: 8px;
+            color: #888;
+            cursor: pointer;
+        }
+
+        .menu-tab.active {
+            background: #9d4edd;
+            color: #fff;
+        }
+
+        .menu-content { flex: 1; }
+
+        .rom-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .rom-item {
+            padding: 15px;
+            background: #222;
+            border-radius: 8px;
+            cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .rom-item:hover { background: rgba(157, 78, 221, 0.3); }
+        .rom-item:hover { background: #333; }
         .rom-item.active { background: #9d4edd; }
 
-        .rom-name {
-            font-size: 0.9em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 200px;
-        }
+        .rom-name { font-weight: 500; }
+        .rom-size { font-size: 0.8em; color: #666; }
 
-        .rom-size {
-            font-size: 0.75em;
-            color: #888;
-        }
-
-        /* Upload */
+        /* Upload zone */
         .upload-zone {
             border: 2px dashed #444;
-            border-radius: 8px;
-            padding: 30px;
+            border-radius: 12px;
+            padding: 40px;
             text-align: center;
+            margin-top: 20px;
             cursor: pointer;
-            transition: all 0.2s;
         }
 
         .upload-zone:hover { border-color: #9d4edd; }
-        .upload-zone.dragover { border-color: #9d4edd; background: rgba(157, 78, 221, 0.1); }
-
         .upload-zone input { display: none; }
 
-        .upload-icon {
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-
-        .upload-progress {
-            margin-top: 10px;
-            height: 4px;
-            background: #333;
-            border-radius: 2px;
-            overflow: hidden;
-            display: none;
-        }
-
-        .upload-progress-bar {
-            height: 100%;
-            background: #9d4edd;
-            width: 0%;
-            transition: width 0.3s;
-        }
-
-        /* Keyboard hints */
-        .keyboard-hints {
-            font-size: 0.8em;
+        /* Status bar */
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 5px;
+            font-size: 10px;
             color: #666;
         }
 
-        .key-row {
+        .status-bar span {
             display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
+            align-items: center;
+            gap: 4px;
         }
 
-        kbd {
-            background: #333;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-
-        /* Toast notifications */
-        .toast {
+        /* Install prompt */
+        .install-prompt {
             position: fixed;
             bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #9d4edd;
+            padding: 15px;
+            border-radius: 12px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 200;
+        }
+
+        .install-prompt.show { display: flex; }
+
+        .install-btn {
+            padding: 8px 16px;
+            background: #fff;
+            color: #9d4edd;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .install-dismiss {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: #333;
@@ -329,134 +473,189 @@
             border-radius: 8px;
             opacity: 0;
             transition: opacity 0.3s;
-            z-index: 1000;
+            z-index: 300;
         }
 
         .toast.show { opacity: 1; }
         .toast.success { background: #059669; }
         .toast.error { background: #dc2626; }
+
+        /* Loading screen */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 400;
+        }
+
+        .loading.hidden { display: none; }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #333;
+            border-top-color: #9d4edd;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎮 GBA Emulator</h1>
-            <div class="status-bar">
-                <span><span class="status-dot" id="connection-status"></span> <span id="status-text">Connecting...</span></span>
-                <span>FPS: <span id="fps">0</span></span>
-                <span>Clients: <span id="clients">0</span></span>
-            </div>
-        </header>
+    <!-- Loading screen -->
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Connecting to emulator...</div>
+    </div>
 
-        <div class="main-content">
-            <div class="game-container">
+    <!-- GBA Console -->
+    <div class="gba-console">
+        <!-- Shoulder buttons (top) -->
+        <div class="shoulder-buttons">
+            <button class="btn-shoulder" data-btn="l">L</button>
+            <button class="btn-shoulder" data-btn="r">R</button>
+        </div>
+
+        <!-- Top bar -->
+        <div class="gba-top">
+            <div class="speaker-grill">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="power-led" id="power-led"></div>
+            <div class="speaker-grill">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <!-- Screen -->
+        <div class="screen-bezel">
+            <div class="screen-inner">
                 <canvas id="game-canvas" width="240" height="160"></canvas>
+            </div>
+            <div class="screen-label">ESP32-P4 GBA</div>
+        </div>
 
-                <div class="game-controls">
-                    <button onclick="sendCommand('reset')">🔄 Reset</button>
-                    <button onclick="togglePause()" id="pause-btn">⏸️ Pause</button>
-                    <button onclick="toggleFullscreen()" class="primary">⛶ Fullscreen</button>
-                    <button onclick="toggleMute()" id="mute-btn">🔊 Sound</button>
-                </div>
-
-                <!-- Virtual Gamepad for touch devices -->
-                <div class="gamepad" id="gamepad">
-                    <div class="shoulder-btns">
-                        <button class="shoulder-btn" data-btn="l">L</button>
-                        <button class="shoulder-btn" data-btn="r">R</button>
-                    </div>
-
-                    <div class="gamepad-row">
-                        <div class="dpad">
-                            <div class="dpad-btn dpad-center"></div>
-                            <button class="dpad-btn" data-btn="up">▲</button>
-                            <div class="dpad-btn dpad-center"></div>
-                            <button class="dpad-btn" data-btn="left">◀</button>
-                            <div class="dpad-btn dpad-center"></div>
-                            <button class="dpad-btn" data-btn="right">▶</button>
-                            <div class="dpad-btn dpad-center"></div>
-                            <button class="dpad-btn" data-btn="down">▼</button>
-                            <div class="dpad-btn dpad-center"></div>
-                        </div>
-
-                        <div class="action-btns">
-                            <button class="action-btn b-btn" data-btn="b">B</button>
-                            <button class="action-btn" data-btn="a">A</button>
-                        </div>
-                    </div>
-
-                    <div class="menu-btns">
-                        <button class="menu-btn" data-btn="select">SELECT</button>
-                        <button class="menu-btn" data-btn="start">START</button>
-                    </div>
+        <!-- Controls -->
+        <div class="controls-area">
+            <!-- D-Pad -->
+            <div class="dpad-container">
+                <div class="dpad">
+                    <div class="dpad-bg"></div>
+                    <div class="dpad-bg-h"></div>
+                    <button class="dpad-btn dpad-up" data-btn="up">▲</button>
+                    <button class="dpad-btn dpad-down" data-btn="down">▼</button>
+                    <button class="dpad-btn dpad-left" data-btn="left">◀</button>
+                    <button class="dpad-btn dpad-right" data-btn="right">▶</button>
+                    <div class="dpad-center"></div>
                 </div>
             </div>
 
-            <div class="sidebar">
-                <div class="panel">
-                    <h3>📁 ROM Library</h3>
-                    <div class="rom-list" id="rom-list">
-                        <div style="color: #666; text-align: center; padding: 20px;">Loading...</div>
-                    </div>
+            <!-- Middle (Start/Select + Menu) -->
+            <div class="middle-section">
+                <button class="menu-close" onclick="toggleMenu()" style="background:#9d4edd;">☰</button>
+                <div class="menu-buttons">
+                    <button class="btn-select" data-btn="select">Select</button>
+                    <button class="btn-start" data-btn="start">Start</button>
                 </div>
+            </div>
 
-                <div class="panel">
-                    <h3>📤 Upload ROM</h3>
-                    <div class="upload-zone" id="upload-zone">
-                        <div class="upload-icon">📁</div>
-                        <div>Drop .gba file here or click to browse</div>
-                        <input type="file" id="file-input" accept=".gba,.agb,.bin">
-                        <div class="upload-progress" id="upload-progress">
-                            <div class="upload-progress-bar" id="upload-progress-bar"></div>
-                        </div>
-                    </div>
+            <!-- A/B Buttons -->
+            <div class="action-buttons">
+                <div style="position:relative;">
+                    <button class="btn-b" data-btn="b">B</button>
                 </div>
+                <div style="position:relative;">
+                    <button class="btn-a" data-btn="a">A</button>
+                </div>
+            </div>
+        </div>
 
-                <div class="panel">
-                    <h3>⌨️ Keyboard Controls</h3>
-                    <div class="keyboard-hints">
-                        <div class="key-row"><span>D-Pad</span><kbd>Arrow Keys</kbd></div>
-                        <div class="key-row"><span>A Button</span><kbd>X</kbd></div>
-                        <div class="key-row"><span>B Button</span><kbd>Z</kbd></div>
-                        <div class="key-row"><span>Start</span><kbd>Enter</kbd></div>
-                        <div class="key-row"><span>Select</span><kbd>Shift</kbd></div>
-                        <div class="key-row"><span>L / R</span><kbd>A</kbd> / <kbd>S</kbd></div>
-                    </div>
+        <!-- Status bar -->
+        <div class="status-bar">
+            <span>FPS: <b id="fps">--</b></span>
+            <span>ROM: <b id="rom-name">None</b></span>
+            <span id="connection-status">●</span>
+        </div>
+    </div>
+
+    <!-- Menu Overlay -->
+    <div class="menu-overlay" id="menu">
+        <div class="menu-header">
+            <h2>🎮 Menu</h2>
+            <button class="menu-close" onclick="toggleMenu()">✕</button>
+        </div>
+
+        <div class="menu-tabs">
+            <button class="menu-tab active" onclick="showTab('roms')">ROMs</button>
+            <button class="menu-tab" onclick="showTab('upload')">Upload</button>
+            <button class="menu-tab" onclick="showTab('settings')">Settings</button>
+        </div>
+
+        <div class="menu-content">
+            <div id="tab-roms">
+                <div class="rom-list" id="rom-list">
+                    <div style="color:#666;text-align:center;padding:20px;">Loading...</div>
+                </div>
+            </div>
+
+            <div id="tab-upload" style="display:none;">
+                <div class="upload-zone" id="upload-zone">
+                    <div style="font-size:3em;margin-bottom:10px;">📁</div>
+                    <div>Tap to select or drop .gba file</div>
+                    <input type="file" id="file-input" accept=".gba,.agb,.bin">
+                </div>
+            </div>
+
+            <div id="tab-settings" style="display:none;">
+                <div class="rom-item" onclick="sendCommand('reset')">
+                    🔄 Reset Game
+                </div>
+                <div class="rom-item" onclick="togglePause()">
+                    ⏯️ <span id="pause-text">Pause</span>
+                </div>
+                <div class="rom-item" onclick="toggleFullscreen()">
+                    ⛶ Fullscreen
+                </div>
+                <div class="rom-item" onclick="installApp()">
+                    📲 Install App
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Install prompt -->
+    <div class="install-prompt" id="install-prompt">
+        <span>📲 Install GBA Emulator as app?</span>
+        <div>
+            <button class="install-btn" onclick="installApp()">Install</button>
+            <button class="install-dismiss" onclick="dismissInstall()">Later</button>
+        </div>
+    </div>
+
+    <!-- Toast -->
     <div class="toast" id="toast"></div>
 
     <script>
         // GBA button bit flags
         const BTN = {
-            A: 1 << 0,
-            B: 1 << 1,
-            SELECT: 1 << 2,
-            START: 1 << 3,
-            RIGHT: 1 << 4,
-            LEFT: 1 << 5,
-            UP: 1 << 6,
-            DOWN: 1 << 7,
-            R: 1 << 8,
-            L: 1 << 9
-        };
-
-        // State
-        let ws = null;
-        let canvas, ctx;
-        let currentButtons = 0;
-        let isPaused = false;
-        let isMuted = false;
-        let currentRom = '';
-
-        // Key mappings
-        const keyMap = {
-            'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
-            'KeyX': 'a', 'KeyZ': 'b', 'Enter': 'start', 'ShiftLeft': 'select', 'ShiftRight': 'select',
-            'KeyA': 'l', 'KeyS': 'r'
+            A: 1, B: 2, SELECT: 4, START: 8,
+            RIGHT: 16, LEFT: 32, UP: 64, DOWN: 128,
+            R: 256, L: 512
         };
 
         const btnMap = {
@@ -465,166 +664,215 @@
             'l': BTN.L, 'r': BTN.R
         };
 
+        const keyMap = {
+            'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
+            'KeyX': 'a', 'KeyZ': 'b', 'Enter': 'start', 'ShiftLeft': 'select', 'ShiftRight': 'select',
+            'KeyA': 'l', 'KeyS': 'r', 'Space': 'a'
+        };
+
+        // State
+        let ws = null;
+        let canvas, ctx;
+        let currentButtons = 0;
+        let isPaused = false;
+        let deferredPrompt = null;
+
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', init);
+
+        function init() {
             canvas = document.getElementById('game-canvas');
             ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = false;
 
+            registerServiceWorker();
             connectWebSocket();
             loadRomList();
-            setupUpload();
             setupInput();
+            setupUpload();
 
-            // Status polling
             setInterval(updateStatus, 2000);
-        });
+        }
 
-        // WebSocket connection
+        // PWA Service Worker
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW failed:', err));
+            }
+
+            // Install prompt
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                setTimeout(() => {
+                    document.getElementById('install-prompt').classList.add('show');
+                }, 3000);
+            });
+        }
+
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(choice => {
+                    if (choice.outcome === 'accepted') {
+                        showToast('App installed!', 'success');
+                    }
+                    deferredPrompt = null;
+                    document.getElementById('install-prompt').classList.remove('show');
+                });
+            }
+        }
+
+        function dismissInstall() {
+            document.getElementById('install-prompt').classList.remove('show');
+        }
+
+        // WebSocket
         function connectWebSocket() {
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${protocol}//${location.host}/ws`);
-
             ws.binaryType = 'arraybuffer';
 
             ws.onopen = () => {
-                document.getElementById('connection-status').classList.add('online');
-                document.getElementById('connection-status').classList.remove('offline');
-                document.getElementById('status-text').textContent = 'Connected';
-                showToast('Connected to emulator', 'success');
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('power-led').classList.add('on');
+                document.getElementById('connection-status').style.color = '#4ade80';
+                showToast('Connected!', 'success');
             };
 
             ws.onclose = () => {
-                document.getElementById('connection-status').classList.remove('online');
-                document.getElementById('connection-status').classList.add('offline');
-                document.getElementById('status-text').textContent = 'Disconnected';
+                document.getElementById('power-led').classList.remove('on');
+                document.getElementById('connection-status').style.color = '#f87171';
                 setTimeout(connectWebSocket, 3000);
             };
 
-            ws.onmessage = (event) => {
-                if (event.data instanceof ArrayBuffer) {
-                    renderFrame(new Uint8Array(event.data));
+            ws.onmessage = (e) => {
+                if (e.data instanceof ArrayBuffer) {
+                    renderFrame(new Uint8Array(e.data));
                 }
             };
         }
 
-        // Render frame from ESP32
         function renderFrame(data) {
-            // Check header
             if (data[0] !== 0x47 || data[1] !== 0x42 || data[2] !== 0x41) return;
 
             const width = data[4] | (data[5] << 8);
             const height = data[6] | (data[7] << 8);
-
             if (width !== 240 || height !== 160) return;
 
-            // RGB565 data starts at offset 8
             const pixelData = new Uint16Array(data.buffer, 8, width * height);
             const imageData = ctx.createImageData(width, height);
 
             for (let i = 0; i < pixelData.length; i++) {
-                const pixel = pixelData[i];
-                const r = ((pixel >> 11) & 0x1F) << 3;
-                const g = ((pixel >> 5) & 0x3F) << 2;
-                const b = (pixel & 0x1F) << 3;
-
-                imageData.data[i * 4 + 0] = r;
-                imageData.data[i * 4 + 1] = g;
-                imageData.data[i * 4 + 2] = b;
-                imageData.data[i * 4 + 3] = 255;
+                const p = pixelData[i];
+                imageData.data[i*4] = ((p >> 11) & 0x1F) << 3;
+                imageData.data[i*4+1] = ((p >> 5) & 0x3F) << 2;
+                imageData.data[i*4+2] = (p & 0x1F) << 3;
+                imageData.data[i*4+3] = 255;
             }
 
             ctx.putImageData(imageData, 0, 0);
         }
 
-        // Input handling
+        // Input
         function setupInput() {
             // Keyboard
             document.addEventListener('keydown', (e) => {
                 const btn = keyMap[e.code];
-                if (btn) {
-                    e.preventDefault();
-                    currentButtons |= btnMap[btn];
-                    sendInput();
-                }
+                if (btn) { e.preventDefault(); pressBtn(btn); }
+                if (e.code === 'Escape') toggleMenu();
             });
 
             document.addEventListener('keyup', (e) => {
                 const btn = keyMap[e.code];
-                if (btn) {
-                    e.preventDefault();
-                    currentButtons &= ~btnMap[btn];
-                    sendInput();
-                }
+                if (btn) { e.preventDefault(); releaseBtn(btn); }
             });
 
-            // Touch gamepad
+            // Touch buttons
             document.querySelectorAll('[data-btn]').forEach(el => {
                 const btn = el.dataset.btn;
 
                 const press = (e) => {
                     e.preventDefault();
-                    currentButtons |= btnMap[btn];
-                    sendInput();
-                    el.style.background = '#9d4edd';
+                    el.classList.add('pressed');
+                    pressBtn(btn);
                 };
 
                 const release = (e) => {
                     e.preventDefault();
-                    currentButtons &= ~btnMap[btn];
-                    sendInput();
-                    el.style.background = '';
+                    el.classList.remove('pressed');
+                    releaseBtn(btn);
                 };
 
-                el.addEventListener('touchstart', press);
-                el.addEventListener('touchend', release);
-                el.addEventListener('touchcancel', release);
+                el.addEventListener('touchstart', press, { passive: false });
+                el.addEventListener('touchend', release, { passive: false });
+                el.addEventListener('touchcancel', release, { passive: false });
                 el.addEventListener('mousedown', press);
                 el.addEventListener('mouseup', release);
                 el.addEventListener('mouseleave', release);
             });
+
+            // Prevent context menu
+            document.addEventListener('contextmenu', e => e.preventDefault());
+        }
+
+        function pressBtn(btn) {
+            currentButtons |= btnMap[btn];
+            sendInput();
+        }
+
+        function releaseBtn(btn) {
+            currentButtons &= ~btnMap[btn];
+            sendInput();
         }
 
         function sendInput() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
+            if (ws?.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'input', buttons: currentButtons }));
             }
         }
 
         function sendCommand(cmd) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'command', cmd: cmd }));
+            if (ws?.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'command', cmd }));
             }
         }
 
         function loadRom(name) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'load_rom', name: name }));
-                currentRom = name;
+            if (ws?.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'load_rom', name }));
+                document.getElementById('rom-name').textContent = name.slice(0, 15);
                 showToast(`Loading ${name}...`);
-
-                // Update UI
-                document.querySelectorAll('.rom-item').forEach(el => {
-                    el.classList.toggle('active', el.dataset.name === name);
-                });
+                toggleMenu();
             }
+        }
+
+        // Menu
+        function toggleMenu() {
+            const menu = document.getElementById('menu');
+            menu.classList.toggle('active');
+            if (menu.classList.contains('active')) loadRomList();
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.menu-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tab}')"]`).classList.add('active');
+
+            document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+            document.getElementById('tab-' + tab).style.display = 'block';
         }
 
         function togglePause() {
             isPaused = !isPaused;
             sendCommand(isPaused ? 'pause' : 'resume');
-            document.getElementById('pause-btn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
-        }
-
-        function toggleMute() {
-            isMuted = !isMuted;
-            sendCommand(isMuted ? 'mute' : 'unmute');
-            document.getElementById('mute-btn').textContent = isMuted ? '🔇 Muted' : '🔊 Sound';
+            document.getElementById('pause-text').textContent = isPaused ? 'Resume' : 'Pause';
         }
 
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
-                canvas.requestFullscreen();
+                document.documentElement.requestFullscreen();
             } else {
                 document.exitFullscreen();
             }
@@ -633,124 +881,77 @@
         // ROM list
         async function loadRomList() {
             try {
-                const response = await fetch('/api/roms');
-                const data = await response.json();
-
+                const res = await fetch('/api/roms');
+                const data = await res.json();
                 const list = document.getElementById('rom-list');
 
-                if (data.roms.length === 0) {
-                    list.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">No ROMs found. Upload one!</div>';
+                if (!data.roms?.length) {
+                    list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No ROMs found. Upload one!</div>';
                     return;
                 }
 
-                list.innerHTML = data.roms.map(rom => `
-                    <div class="rom-item ${rom.name === currentRom ? 'active' : ''}"
-                         data-name="${rom.name}"
-                         onclick="loadRom('${rom.name}')">
-                        <span class="rom-name">${rom.name}</span>
-                        <span class="rom-size">${formatSize(rom.size)}</span>
+                list.innerHTML = data.roms.map(r => `
+                    <div class="rom-item" onclick="loadRom('${r.name}')">
+                        <span class="rom-name">${r.name}</span>
+                        <span class="rom-size">${(r.size/1024/1024).toFixed(1)} MB</span>
                     </div>
                 `).join('');
             } catch (e) {
-                console.error('Failed to load ROM list:', e);
+                console.error('Failed to load ROMs:', e);
             }
         }
 
-        function formatSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
-
-        // Upload handling
+        // Upload
         function setupUpload() {
             const zone = document.getElementById('upload-zone');
             const input = document.getElementById('file-input');
 
-            zone.addEventListener('click', () => input.click());
+            zone.onclick = () => input.click();
 
-            zone.addEventListener('dragover', (e) => {
+            zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = '#9d4edd'; };
+            zone.ondragleave = () => { zone.style.borderColor = '#444'; };
+            zone.ondrop = (e) => {
                 e.preventDefault();
-                zone.classList.add('dragover');
-            });
+                zone.style.borderColor = '#444';
+                if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+            };
 
-            zone.addEventListener('dragleave', () => {
-                zone.classList.remove('dragover');
-            });
-
-            zone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                zone.classList.remove('dragover');
-                if (e.dataTransfer.files.length) {
-                    uploadFile(e.dataTransfer.files[0]);
-                }
-            });
-
-            input.addEventListener('change', () => {
-                if (input.files.length) {
-                    uploadFile(input.files[0]);
-                }
-            });
+            input.onchange = () => { if (input.files[0]) uploadFile(input.files[0]); };
         }
 
         async function uploadFile(file) {
-            const progress = document.getElementById('upload-progress');
-            const bar = document.getElementById('upload-progress-bar');
-
-            progress.style.display = 'block';
-            bar.style.width = '0%';
-
+            showToast('Uploading...');
             try {
-                const xhr = new XMLHttpRequest();
-
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
-                        bar.style.width = (e.loaded / e.total * 100) + '%';
-                    }
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: { 'X-Filename': file.name },
+                    body: file
                 });
-
-                xhr.onload = () => {
-                    progress.style.display = 'none';
-                    if (xhr.status === 200) {
-                        showToast('ROM uploaded successfully!', 'success');
-                        loadRomList();
-                    } else {
-                        showToast('Upload failed', 'error');
-                    }
-                };
-
-                xhr.onerror = () => {
-                    progress.style.display = 'none';
+                if (res.ok) {
+                    showToast('Uploaded!', 'success');
+                    loadRomList();
+                    showTab('roms');
+                } else {
                     showToast('Upload failed', 'error');
-                };
-
-                xhr.open('POST', '/api/upload');
-                xhr.setRequestHeader('X-Filename', file.name);
-                xhr.send(file);
-
+                }
             } catch (e) {
-                progress.style.display = 'none';
-                showToast('Upload failed: ' + e.message, 'error');
+                showToast('Upload error', 'error');
             }
         }
 
-        // Status updates
+        // Status
         async function updateStatus() {
             try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-
-                document.getElementById('fps').textContent = data.fps.toFixed(1);
-                document.getElementById('clients').textContent = data.clients;
-            } catch (e) {
-                // Ignore errors
-            }
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                document.getElementById('fps').textContent = data.fps?.toFixed(1) || '--';
+            } catch (e) {}
         }
 
-        // Toast notifications
-        function showToast(message, type = '') {
+        // Toast
+        function showToast(msg, type = '') {
             const toast = document.getElementById('toast');
-            toast.textContent = message;
+            toast.textContent = msg;
             toast.className = 'toast show ' + type;
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
