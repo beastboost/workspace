@@ -90,6 +90,32 @@ menu "GBA Emulator Configuration"
             default 20
     endmenu
 
+    menu "WiFi Configuration"
+        config WIFI_SSID
+            string "WiFi SSID"
+            default "YourWiFiSSID"
+            help
+                WiFi network name to connect to.
+
+        config WIFI_PASSWORD
+            string "WiFi Password"
+            default "YourWiFiPassword"
+            help
+                WiFi network password.
+
+        config WEBSERVER_PORT
+            int "Web server port"
+            default 80
+            help
+                HTTP port for web interface.
+
+        config WEBSERVER_ENABLE
+            bool "Enable web server"
+            default y
+            help
+                Enable web-based ROM management and streaming.
+    endmenu
+
     menu "SD Card Configuration"
         config GBA_SD_4BIT_MODE
             bool "Use 4-bit SD mode"

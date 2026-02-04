@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "src/webserver.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        esp_http_server
+        json
+        fatfs
+    EMBED_FILES
+        "www/index.html"
+)

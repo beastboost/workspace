@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GBA Emulator - ESP32-P4</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2em;
+            background: linear-gradient(90deg, #9d4edd, #c77dff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-size: 0.9em;
+            color: #888;
+            margin-top: 10px;
+        }
+
+        .status-bar span { display: flex; align-items: center; gap: 5px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.online { background: #4ade80; }
+        .status-dot.offline { background: #f87171; }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content { grid-template-columns: 1fr; }
+        }
+
+        /* Game Screen */
+        .game-container {
+            background: #000;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #game-canvas {
+            width: 100%;
+            max-width: 480px;
+            aspect-ratio: 240 / 160;
+            background: #111;
+            border-radius: 8px;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .game-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .game-controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #333;
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        .game-controls button:hover { background: #444; }
+        .game-controls button:active { transform: scale(0.95); }
+        .game-controls button.primary { background: #9d4edd; }
+        .game-controls button.danger { background: #dc2626; }
+
+        /* Virtual Gamepad */
+        .gamepad {
+            display: none;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        @media (max-width: 768px) {
+            .gamepad { display: block; }
+        }
+
+        .gamepad-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 2px;
+        }
+
+        .dpad-btn {
+            background: #333;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .dpad-btn:active { background: #9d4edd; }
+        .dpad-center { background: transparent; }
+
+        .action-btns {
+            display: flex;
+            gap: 15px;
+        }
+
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #dc2626;
+            border: none;
+            color: #fff;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .action-btn.b-btn { background: #f59e0b; }
+        .action-btn:active { filter: brightness(1.3); }
+
+        .shoulder-btns {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .shoulder-btn {
+            padding: 15px 30px;
+            background: #444;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .shoulder-btn:active { background: #9d4edd; }
+
+        .menu-btns {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .menu-btn {
+            padding: 8px 20px;
+            background: #555;
+            border: none;
+            border-radius: 20px;
+            color: #fff;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+
+        .menu-btn:active { background: #9d4edd; }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .panel h3 {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ROM List */
+        .rom-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .rom-item {
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .rom-item:hover { background: rgba(157, 78, 221, 0.3); }
+        .rom-item.active { background: #9d4edd; }
+
+        .rom-name {
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .rom-size {
+            font-size: 0.75em;
+            color: #888;
+        }
+
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed #444;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-zone:hover { border-color: #9d4edd; }
+        .upload-zone.dragover { border-color: #9d4edd; background: rgba(157, 78, 221, 0.1); }
+
+        .upload-zone input { display: none; }
+
+        .upload-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .upload-progress {
+            margin-top: 10px;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .upload-progress-bar {
+            height: 100%;
+            background: #9d4edd;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Keyboard hints */
+        .keyboard-hints {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .key-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        kbd {
+            background: #333;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            padding: 12px 24px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show { opacity: 1; }
+        .toast.success { background: #059669; }
+        .toast.error { background: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 GBA Emulator</h1>
+            <div class="status-bar">
+                <span><span class="status-dot" id="connection-status"></span> <span id="status-text">Connecting...</span></span>
+                <span>FPS: <span id="fps">0</span></span>
+                <span>Clients: <span id="clients">0</span></span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="game-container">
+                <canvas id="game-canvas" width="240" height="160"></canvas>
+
+                <div class="game-controls">
+                    <button onclick="sendCommand('reset')">🔄 Reset</button>
+                    <button onclick="togglePause()" id="pause-btn">⏸️ Pause</button>
+                    <button onclick="toggleFullscreen()" class="primary">⛶ Fullscreen</button>
+                    <button onclick="toggleMute()" id="mute-btn">🔊 Sound</button>
+                </div>
+
+                <!-- Virtual Gamepad for touch devices -->
+                <div class="gamepad" id="gamepad">
+                    <div class="shoulder-btns">
+                        <button class="shoulder-btn" data-btn="l">L</button>
+                        <button class="shoulder-btn" data-btn="r">R</button>
+                    </div>
+
+                    <div class="gamepad-row">
+                        <div class="dpad">
+                            <div class="dpad-btn dpad-center"></div>
+                            <button class="dpad-btn" data-btn="up">▲</button>
+                            <div class="dpad-btn dpad-center"></div>
+                            <button class="dpad-btn" data-btn="left">◀</button>
+                            <div class="dpad-btn dpad-center"></div>
+                            <button class="dpad-btn" data-btn="right">▶</button>
+                            <div class="dpad-btn dpad-center"></div>
+                            <button class="dpad-btn" data-btn="down">▼</button>
+                            <div class="dpad-btn dpad-center"></div>
+                        </div>
+
+                        <div class="action-btns">
+                            <button class="action-btn b-btn" data-btn="b">B</button>
+                            <button class="action-btn" data-btn="a">A</button>
+                        </div>
+                    </div>
+
+                    <div class="menu-btns">
+                        <button class="menu-btn" data-btn="select">SELECT</button>
+                        <button class="menu-btn" data-btn="start">START</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="panel">
+                    <h3>📁 ROM Library</h3>
+                    <div class="rom-list" id="rom-list">
+                        <div style="color: #666; text-align: center; padding: 20px;">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>📤 Upload ROM</h3>
+                    <div class="upload-zone" id="upload-zone">
+                        <div class="upload-icon">📁</div>
+                        <div>Drop .gba file here or click to browse</div>
+                        <input type="file" id="file-input" accept=".gba,.agb,.bin">
+                        <div class="upload-progress" id="upload-progress">
+                            <div class="upload-progress-bar" id="upload-progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>⌨️ Keyboard Controls</h3>
+                    <div class="keyboard-hints">
+                        <div class="key-row"><span>D-Pad</span><kbd>Arrow Keys</kbd></div>
+                        <div class="key-row"><span>A Button</span><kbd>X</kbd></div>
+                        <div class="key-row"><span>B Button</span><kbd>Z</kbd></div>
+                        <div class="key-row"><span>Start</span><kbd>Enter</kbd></div>
+                        <div class="key-row"><span>Select</span><kbd>Shift</kbd></div>
+                        <div class="key-row"><span>L / R</span><kbd>A</kbd> / <kbd>S</kbd></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // GBA button bit flags
+        const BTN = {
+            A: 1 << 0,
+            B: 1 << 1,
+            SELECT: 1 << 2,
+            START: 1 << 3,
+            RIGHT: 1 << 4,
+            LEFT: 1 << 5,
+            UP: 1 << 6,
+            DOWN: 1 << 7,
+            R: 1 << 8,
+            L: 1 << 9
+        };
+
+        // State
+        let ws = null;
+        let canvas, ctx;
+        let currentButtons = 0;
+        let isPaused = false;
+        let isMuted = false;
+        let currentRom = '';
+
+        // Key mappings
+        const keyMap = {
+            'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
+            'KeyX': 'a', 'KeyZ': 'b', 'Enter': 'start', 'ShiftLeft': 'select', 'ShiftRight': 'select',
+            'KeyA': 'l', 'KeyS': 'r'
+        };
+
+        const btnMap = {
+            'a': BTN.A, 'b': BTN.B, 'start': BTN.START, 'select': BTN.SELECT,
+            'up': BTN.UP, 'down': BTN.DOWN, 'left': BTN.LEFT, 'right': BTN.RIGHT,
+            'l': BTN.L, 'r': BTN.R
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            canvas = document.getElementById('game-canvas');
+            ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+
+            connectWebSocket();
+            loadRomList();
+            setupUpload();
+            setupInput();
+
+            // Status polling
+            setInterval(updateStatus, 2000);
+        });
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                document.getElementById('connection-status').classList.add('online');
+                document.getElementById('connection-status').classList.remove('offline');
+                document.getElementById('status-text').textContent = 'Connected';
+                showToast('Connected to emulator', 'success');
+            };
+
+            ws.onclose = () => {
+                document.getElementById('connection-status').classList.remove('online');
+                document.getElementById('connection-status').classList.add('offline');
+                document.getElementById('status-text').textContent = 'Disconnected';
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data instanceof ArrayBuffer) {
+                    renderFrame(new Uint8Array(event.data));
+                }
+            };
+        }
+
+        // Render frame from ESP32
+        function renderFrame(data) {
+            // Check header
+            if (data[0] !== 0x47 || data[1] !== 0x42 || data[2] !== 0x41) return;
+
+            const width = data[4] | (data[5] << 8);
+            const height = data[6] | (data[7] << 8);
+
+            if (width !== 240 || height !== 160) return;
+
+            // RGB565 data starts at offset 8
+            const pixelData = new Uint16Array(data.buffer, 8, width * height);
+            const imageData = ctx.createImageData(width, height);
+
+            for (let i = 0; i < pixelData.length; i++) {
+                const pixel = pixelData[i];
+                const r = ((pixel >> 11) & 0x1F) << 3;
+                const g = ((pixel >> 5) & 0x3F) << 2;
+                const b = (pixel & 0x1F) << 3;
+
+                imageData.data[i * 4 + 0] = r;
+                imageData.data[i * 4 + 1] = g;
+                imageData.data[i * 4 + 2] = b;
+                imageData.data[i * 4 + 3] = 255;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Input handling
+        function setupInput() {
+            // Keyboard
+            document.addEventListener('keydown', (e) => {
+                const btn = keyMap[e.code];
+                if (btn) {
+                    e.preventDefault();
+                    currentButtons |= btnMap[btn];
+                    sendInput();
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                const btn = keyMap[e.code];
+                if (btn) {
+                    e.preventDefault();
+                    currentButtons &= ~btnMap[btn];
+                    sendInput();
+                }
+            });
+
+            // Touch gamepad
+            document.querySelectorAll('[data-btn]').forEach(el => {
+                const btn = el.dataset.btn;
+
+                const press = (e) => {
+                    e.preventDefault();
+                    currentButtons |= btnMap[btn];
+                    sendInput();
+                    el.style.background = '#9d4edd';
+                };
+
+                const release = (e) => {
+                    e.preventDefault();
+                    currentButtons &= ~btnMap[btn];
+                    sendInput();
+                    el.style.background = '';
+                };
+
+                el.addEventListener('touchstart', press);
+                el.addEventListener('touchend', release);
+                el.addEventListener('touchcancel', release);
+                el.addEventListener('mousedown', press);
+                el.addEventListener('mouseup', release);
+                el.addEventListener('mouseleave', release);
+            });
+        }
+
+        function sendInput() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'input', buttons: currentButtons }));
+            }
+        }
+
+        function sendCommand(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'command', cmd: cmd }));
+            }
+        }
+
+        function loadRom(name) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'load_rom', name: name }));
+                currentRom = name;
+                showToast(`Loading ${name}...`);
+
+                // Update UI
+                document.querySelectorAll('.rom-item').forEach(el => {
+                    el.classList.toggle('active', el.dataset.name === name);
+                });
+            }
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            sendCommand(isPaused ? 'pause' : 'resume');
+            document.getElementById('pause-btn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            sendCommand(isMuted ? 'mute' : 'unmute');
+            document.getElementById('mute-btn').textContent = isMuted ? '🔇 Muted' : '🔊 Sound';
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                canvas.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // ROM list
+        async function loadRomList() {
+            try {
+                const response = await fetch('/api/roms');
+                const data = await response.json();
+
+                const list = document.getElementById('rom-list');
+
+                if (data.roms.length === 0) {
+                    list.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">No ROMs found. Upload one!</div>';
+                    return;
+                }
+
+                list.innerHTML = data.roms.map(rom => `
+                    <div class="rom-item ${rom.name === currentRom ? 'active' : ''}"
+                         data-name="${rom.name}"
+                         onclick="loadRom('${rom.name}')">
+                        <span class="rom-name">${rom.name}</span>
+                        <span class="rom-size">${formatSize(rom.size)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load ROM list:', e);
+            }
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Upload handling
+        function setupUpload() {
+            const zone = document.getElementById('upload-zone');
+            const input = document.getElementById('file-input');
+
+            zone.addEventListener('click', () => input.click());
+
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    uploadFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            input.addEventListener('change', () => {
+                if (input.files.length) {
+                    uploadFile(input.files[0]);
+                }
+            });
+        }
+
+        async function uploadFile(file) {
+            const progress = document.getElementById('upload-progress');
+            const bar = document.getElementById('upload-progress-bar');
+
+            progress.style.display = 'block';
+            bar.style.width = '0%';
+
+            try {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        bar.style.width = (e.loaded / e.total * 100) + '%';
+                    }
+                });
+
+                xhr.onload = () => {
+                    progress.style.display = 'none';
+                    if (xhr.status === 200) {
+                        showToast('ROM uploaded successfully!', 'success');
+                        loadRomList();
+                    } else {
+                        showToast('Upload failed', 'error');
+                    }
+                };
+
+                xhr.onerror = () => {
+                    progress.style.display = 'none';
+                    showToast('Upload failed', 'error');
+                };
+
+                xhr.open('POST', '/api/upload');
+                xhr.setRequestHeader('X-Filename', file.name);
+                xhr.send(file);
+
+            } catch (e) {
+                progress.style.display = 'none';
+                showToast('Upload failed: ' + e.message, 'error');
+            }
+        }
+
+        // Status updates
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                document.getElementById('fps').textContent = data.fps.toFixed(1);
+                document.getElementById('clients').textContent = data.clients;
+            } catch (e) {
+                // Ignore errors
+            }
+        }
+
+        // Toast notifications
+        function showToast(message, type = '') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
