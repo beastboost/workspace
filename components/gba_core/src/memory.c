@@ -407,35 +407,44 @@ uint16_t memory_read16(gba_t *gba, uint32_t addr)
 
 uint32_t memory_read32(gba_t *gba, uint32_t addr)
 {
-    addr &= ~3;  // Align
+    // GBA rotates unaligned 32-bit reads
+    uint8_t misalign = addr & 3;
+    addr &= ~3;  // Align to 4-byte boundary
 
+    uint32_t value = 0;
     switch ((addr >> 24) & 0xFF) {
         case 0x00:
             if (addr < BIOS_SIZE) {
-                return *(uint32_t*)&gba->mem.bios[addr];
+                value = *(uint32_t*)&gba->mem.bios[addr];
             }
             break;
 
         case 0x02:
-            return *(uint32_t*)&gba->mem.ewram[addr & (EWRAM_SIZE - 1)];
+            value = *(uint32_t*)&gba->mem.ewram[addr & (EWRAM_SIZE - 1)];
+            break;
 
         case 0x03:
-            return *(uint32_t*)&gba->mem.iwram[addr & (IWRAM_SIZE - 1)];
+            value = *(uint32_t*)&gba->mem.iwram[addr & (IWRAM_SIZE - 1)];
+            break;
 
         case 0x04:
-            return io_read32(gba, addr);
+            value = io_read32(gba, addr);
+            break;
 
         case 0x05:
-            return *(uint32_t*)&gba->mem.palette[addr & (PALETTE_SIZE - 1)];
+            value = *(uint32_t*)&gba->mem.palette[addr & (PALETTE_SIZE - 1)];
+            break;
 
         case 0x06: {
             uint32_t vram_addr = addr & 0x1FFFF;
             if (vram_addr >= VRAM_SIZE) vram_addr -= 0x8000;
-            return *(uint32_t*)&gba->mem.vram[vram_addr];
+            value = *(uint32_t*)&gba->mem.vram[vram_addr];
+            break;
         }
 
         case 0x07:
-            return *(uint32_t*)&gba->mem.oam[addr & (OAM_SIZE - 1)];
+            value = *(uint32_t*)&gba->mem.oam[addr & (OAM_SIZE - 1)];
+            break;
 
         case 0x08:
         case 0x09:
@@ -445,17 +454,26 @@ uint32_t memory_read32(gba_t *gba, uint32_t addr)
         case 0x0D: {
             uint32_t rom_addr = addr & 0x01FFFFFF;
             if (rom_addr < gba->mem.rom_size) {
-                return *(uint32_t*)&gba->mem.rom[rom_addr];
+                value = *(uint32_t*)&gba->mem.rom[rom_addr];
+            } else {
+                value = ((rom_addr >> 1) & 0xFFFF) | (((rom_addr >> 1) + 1) << 16);
             }
-            return ((rom_addr >> 1) & 0xFFFF) | (((rom_addr >> 1) + 1) << 16);
+            break;
         }
 
         case 0x0E:
         case 0x0F:
-            return gba->mem.sram[addr & (SRAM_SIZE - 1)] * 0x01010101;
+            value = gba->mem.sram[addr & (SRAM_SIZE - 1)] * 0x01010101;
+            break;
     }
 
-    return 0;
+    // Apply rotation for unaligned access
+    if (misalign) {
+        uint8_t shift = misalign * 8;
+        value = (value >> shift) | (value << (32 - shift));
+    }
+
+    return value;
 }
 
 // Main memory write functions

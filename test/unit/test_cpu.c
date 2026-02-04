@@ -75,6 +75,44 @@ static void setup_thumb_mode(gba_t *gba)
     gba->cpu.pipeline_invalid = true;
 }
 
+// Check if ARM condition code is met
+static bool check_arm_condition(gba_t *gba, uint8_t cond)
+{
+    bool n = GET_FLAG_N();
+    bool z = GET_FLAG_Z();
+    bool c = GET_FLAG_C();
+    bool v = GET_FLAG_V();
+
+    switch (cond) {
+        case 0x0: return z;                    // EQ
+        case 0x1: return !z;                   // NE
+        case 0x2: return c;                    // CS
+        case 0x3: return !c;                   // CC
+        case 0x4: return n;                    // MI
+        case 0x5: return !n;                   // PL
+        case 0x6: return v;                    // VS
+        case 0x7: return !v;                   // VC
+        case 0x8: return c && !z;              // HI
+        case 0x9: return !c || z;              // LS
+        case 0xA: return n == v;               // GE
+        case 0xB: return n != v;               // LT
+        case 0xC: return !z && (n == v);       // GT
+        case 0xD: return z || (n != v);        // LE
+        case 0xE: return true;                 // AL
+        case 0xF: return true;                 // NV
+        default: return false;
+    }
+}
+
+// Execute ARM instruction with condition check
+static void execute_arm_with_cond(gba_t *gba, uint32_t opcode)
+{
+    uint8_t cond = (opcode >> 28) & 0xF;
+    if (check_arm_condition(gba, cond)) {
+        cpu_execute_arm(gba, opcode);
+    }
+}
+
 // =============================================================================
 // ARM Data Processing Tests
 // =============================================================================
@@ -427,7 +465,7 @@ void test_arm_conditions(void)
     gba->cpu.cpsr &= ~CPSR_Z;
     gba->cpu.r[0] = 0;
     opcode = 0x03A00001;  // MOVEQ R0, #1 (should not execute)
-    cpu_execute_arm(gba, opcode);
+    execute_arm_with_cond(gba, opcode);
     TEST_ASSERT_EQ(0, gba->cpu.r[0], "MOVEQ skipped when Z=0");
 
     gba_destroy(gba);

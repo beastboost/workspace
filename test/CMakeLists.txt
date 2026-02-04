@@ -16,8 +16,9 @@ else()
     set(CMAKE_C_STANDARD 11)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -g -DTEST_HOST")
 
-    # Include paths
+    # Include paths - stubs must come first to override ESP-IDF headers
     include_directories(
+        ${CMAKE_SOURCE_DIR}/stubs
         ${CMAKE_SOURCE_DIR}/../components/gba_core/include
         ${CMAKE_SOURCE_DIR}/../components/gba_core/src
     )
