@@ -1,0 +1,22 @@
+# Build directories
+build/
+test/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# OS
+.DS_Store
+Thumbs.db
